@@ -1,0 +1,346 @@
+# Зависимости
+В каждом коде со временем появляются зависимости, которые мешают расширению программы.
+Например в классе __ChatPrinter__ есть зависимость от Класса __Reader__. Это отношение __композиция__.
+Это плохо, так как при такой сильной зависимости сложно менять класс reader и его методы. Как только нужно будет изменить метод __print()__, сразу придется менять метод __chat()__. 
+Это __Сильная зависимость__
+```Java
+public class ChatPrinter {
+    // зависимость от Reader
+   private Reader reader = new Reader();
+
+    public void chat(String s){
+        reader.print(s);
+    }
+}
+```
+Один из способов облегчения данной зависимости, это выделениее из класса __Reader__ интерфейс. Тогда будет легче работать с разными реализациями этого интерфейса. Но это не решает проблему прямой зависимости, это все еще композиция.
+Это __Слабая зависимость__
+```Java
+public class ChatPrinter {
+   private Reader helloReader = new HelloReader();
+   private Reader byeReader = new ByeReader();
+
+    public void chat(String s){
+        helloReader.print(s);
+        byeReader.print(s);
+    }
+}
+```
+Следующий шаг - это поменять __композицию__ на __агрегацию__, то есть принимать конкретную реализацию интерфейса __reader__ на вход в __конструкторе__ класса. И тогда нам будет очень просто редактировать функционал, можно просто создать другую реализацию интерфейса и передать ее на вход или поменять сам метод, клас __ChatPrinter__ теперь не зависит от конкретной реализации. Так же это называетс __инверсия зависимостей (Inversion of Control)__ - Классы должны зависеть от абстракций, а не от конкретной реализации.
+Это __Отсутсвие зависимости__ так как ChatPrinter сам не создает объект Reader, он просто получает его на вход в конструкторе.
+```Java
+// ИНТЕРФЕЙС READER
+public interface Reader {
+    public void print(String s);
+}
+
+// КЛАСС ИСПОЛЬЗУЮЩИЙ ИНТЕРФЕЙС READER
+public class ChatPrinter {
+    Reader helloReader;
+    Reader byeReader;
+
+    // Теперь у нас есть возможность управлять функционалом интерфейса Reader
+    // но класс ChatPrinter не знает о существовании и внутренней работе
+    // данного интерфейса. это еще называется Агрегация
+    public ChatPrinter(Reader helloReader, Reader byeReader) {
+        this.helloReader = helloReader;
+        this.byeReader = byeReader;
+    }
+
+    public void chat(String s){
+        helloReader.print(s);
+        byeReader.print(s);
+    }
+}
+
+// ПРОГРАММА, ИСПОЛЬЗУЮЩАЯ ChatPrinter
+public class Solution {
+    public static void main(String[] args) {
+        ChatPrinter chatPrinter = new ChatPrinter(new HelloReader(), new ByeReader());
+        chatPrinter.chat("Valya");
+    }
+}
+```
+__Инверсия зависимостей (IoC)__ - это такой архитектурный подход, когда сущность не сама создает зависимости, а ей на вход поставляются зависимости. (Пример выше)
+
+Но есть еще одна проблема. Как видно выше объект __ChatPrinter__ нужно еще __где-то создавать__. В данном случае в классе __Solution__. А это тоже __сильная зависимость__. И данная проблема решается с помощью __Внедрения зависимостей (Dependency Injection)__. А этим занимается __Spring__.
+
+# Конфигурация Spring MVC
+## XML
+Для конфигурации с помощью XML нужен только 1 файл, например __applicationContext.xml__, внутри которого описываются все бины, а так же их properties и так далее.
+Из важного здесь надо отметить:
+__<context:property-placeholder location="classpath:application.properties"/>__ - Нужно, чтобы указать на местонахождениее файла .properties, в котором можно указывать разные данные и подставлять их, например __MessageMaker.defaultMessage__
+__MessageMaker.defaultMessage=Valya__ <- внутри application.properties
+
+```XML
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:property-placeholder location="classpath:application.properties"/>
+    <bean id="byePrinter"
+          class="MessageMaker.printer.ByePrinter"/>
+
+    <bean id="helloPrinter"
+          class="MessageMaker.printer.HelloPrinter"/>
+
+    <bean id="messageMaker.byePrinter"
+          class="MessageMaker.MessageMaker">
+        <constructor-arg ref="byePrinter"/>
+        <property name="defaultMessage" value="${MessageMaker.defaultMessage}"/>
+    </bean>
+
+    <bean id="messageMaker.helloPrinter"
+          class="MessageMaker.MessageMaker"
+          scope="prototype"
+          factory-method="getMessageMaker">
+        <constructor-arg ref="helloPrinter"/>
+        <property name="defaultMessage" value="${MessageMaker.defaultMessage}"/>
+    </bean>
+</beans>
+```
+Далее для создания объектов и внедрения зависимостей используется такой синтаксис:
+```Java
+ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(
+        "applicationContext.xml"
+);
+
+MessageMaker helloMessage = context.getBean("messageMaker.helloPrinter", MessageMaker.class);
+helloMessage.print();
+
+context.close();
+```
+В конце используем __context.close()__. Чтобы подчистить все бины, удалить фабрики и так далее.
+
+## XML + Java Annotation
+Это почти как XML конфигурация, но многое делается автоматически спрингом.
+В данном случае опять понадобится файл конфигурации XML, но вместо создания бинов вручную, мы просто пишем аннотацию @Component
+Для создания нескольких бинов, на основе одного класса в данном случае можно воспользоваться наследствием, подробнее:
+https://www.baeldung.com/spring-same-class-multiple-beans
+
+Добавили Компонент скан и проперти плейсхолдер.
+```XML
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd">
+    <context:property-placeholder location="classpath:application.properties"/>
+    <context:component-scan base-package="shilaev"/>
+</beans>
+```
+@Value - Для подставления значений из файла __.properties__ или просто значений
+@Autowired - для авто-инъекции зависимостей
+@Qualifired - для выбора какой именно класс внедрить
+```Java
+    @Value("${MessageMaker.gefaultMessage}")
+    public void setDefaultMessage(String defaultMessage) {
+        this.defaultMessage = defaultMessage;
+    }
+
+    @Autowired
+    public MessageMakerByePrinter(@Qualifier("byePrinter") Printer printer) {
+        super(printer);
+    }
+    
+```
+С контекстом все то же самое.
+```Java
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(
+                "applicationContext.xml"
+        );
+
+        MessageMaker helloMessage = context.getBean("messageMaker.helloPrinter", MessageMaker.class);
+        helloMessage.print();
+
+        MessageMaker byeMessage = context.getBean("messageMaker.byePrinter", MessageMaker.class);
+        byeMessage.print();
+
+        context.close();
+```
+
+## Java Annotation
+Ну с аннотациями все еще проще и компактнее, нужен только один класс, который будет выполнять задачи конфигурационного файла с аннотацией:
+@Configuration - определяет конфигурационный файл
+@ComponentScan - аналог компонент скана из XML конфигурации. Указывает на папку в которой искать бины
+@PropertySource - аналог Property-placeholder. Указывает на местоположение файла проперти.
+@Autowired - автоподстановка
+@Bean - аналог <bean></bean>
+Исопльзование выглядит так. 
+Так же берем бины из контекста, только класс контекста поменялся, теперь это __AnnotationConfigApplicationContext__.
+```Java
+public class Solution {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context =
+                new AnnotationConfigApplicationContext(SpringConfiguration.class);
+
+        MessageMaker helloMessage = context.getBean("messageMaker.helloPrinter", MessageMaker.class);
+        helloMessage.print();
+
+        MessageMaker byeMessage = context.getBean("messageMaker.byePrinter", MessageMaker.class);
+        byeMessage.print();
+
+        context.close();
+    }
+}
+```
+
+## Model View Controller
+Это паттерн проектирования приложений, который состоит из 3 компонентов
+__Model__ - Логика работы с данными. В основном работа с базой данных, и запросами в контроллер
+__Controller__ - логика навигации, обработка запросов. Сюда попадает HTTP Запрос
+__View__ - логика представления. интерфейс. Слой презентации, то что видит пользователь.
+__DispatcherServlet__ - Это особый, главный сервлет. Является входной точкой Spring MVC приложения. Реализован за нас.
+__HTTP__ запрос от пользователя приходит на сервер. Сервер обрабатыват запрос и передает его на __Spring MVC__ приложение. Затем запрос попадает в __DispatcherServlet__. __DispatcherServlet__ отправляет запрос на __правильный контроллер__.
+__DispatcherServlet__ - Прослойка между __Controller__ и __HTTP Request__
+
+Для Web приложения нужно все та же Spring конфигурация, но теперь добавляется файл __web.xml__, в котором прописываются данные мапинге сервлетов, url паттернов и так далее. Этот файл должен располагаться в папке __WEB-INF__.
+
+
+```XML
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
+  http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd" version="4.0">
+```
+В этом элементе прописываются параметр, которым инициализируются сервлеты.
+Имя параметра и его значение.
+Далее этот параметр - Hello Servlets - будет доступен всем сервлетам в приложении.
+Для его получения внутри класса сервлета есть метод 
+__getServletContext()__ - вовзращает ServletContext.
+Затем у этого объекта вызывается __getInitParameter()__
+```XML
+  <context-param>
+    <param-name>message</param-name>
+    <param-value>Hello Servlets</param-value>
+  </context-param>
+```
+Это проекция сервлета на класс. По сути описание Сервлета, один сервлет может обслуживать запросы по разным URL.
+Сервлет под именем HelloWorld - это класс HelloServlet.class в коде.
+```XML
+  <servlet>
+       <servlet-name>HelloWorld</servlet-name>
+       <servlet-class>HelloServlet</servlet-class>
+   </servlet>
+```
+Это мапинг имя сервлета и часть URL. __(http://localhost/welcome)__
+То есть при обращении к пути /welcome вызовется сервлет HelloServlet.class
+Проще говоря - HelloWorld сервлет - это URL /welcome
+```XML
+  <servlet-mapping>
+      <servlet-name>HelloWorld</servlet-name>
+      <url-pattern>/welcome</url-pattern>
+  </servlet-mapping>
+```
+Это файл, который нужно отдать по запросу http://localhost/ - или другой welcome page
+Если просто запросить корень веб приложения, то ему отдастся содержимое файла index.html
+```XML
+  <welcome-file-list>
+      <welcome-file>index.html</welcome-file>
+  </welcome-file-list>
+```
+```XML
+</web-app>
+```
+
+## CRUD, REST, DAO
+__CRUD__ - Это стандартная классификация функуйий по манипуляции данными
+- __Create__
+- __Read__
+- __Update__
+- __Delete__
+
+<img src="./images/CRUD_example.png" alt="alt text" width="900"/>
+
+__REST__ - Паттерн проектирования WEB приложений. Описывает то, как посредтсвом протокола HTTP должен взаимодействовать клиент с сервером.
+Все взаимодействие с сервером сводится к 4 опирациям - get, add, update, delete.
+Для каждой из 4 операций исопльзуется свой HTTP метод: Get, Post, Patch, Delete.
+
+__DAO__ - Паттерн Data Acces Object. Чтобы модель напрямую не взаимодействовала с базой данных, лучше вынести эту логику из самой модели в отдельный класс. 
+То есть это паттерн, при при котором Отдельный класс знаимается взаимодейсвтием с БД для конкретной сущности.
+
+Внутри PersonDAO будут методы, которые будут взаимодействовать напрямую с БД, а затем передавать результаты в Person. Обычно внутри SQL код.
+
+<img src="./images/DAO_example.png" alt="alt text" width="400"/>
+
+## Post maping
+Без использования шаблонизатора Thymeleaf
+```Java
+@GetMapping("/add_account")
+public String getAddAccount(Model model,
+                            @RequestParam(value = "noname", required = false) String name,
+                            @RequestParam(value = "noname", required = false) Float balance,
+                            @RequestParam(value = "noname", required = false) String type) {
+        return "accounts/account_add_form";
+    }
+
+@PostMapping("/add_account")
+public String postAddedAccount(Model model,
+                                @RequestParam() String name,
+                                @RequestParam() Float balance,
+                                @RequestParam() String type) {
+    Account newAccount = new Account();
+    newAccount.setName(name);
+    newAccount.setBalance(balance);
+    newAccount.setType(type);
+    accountDAO.addAccount(newAccount);
+
+    return "redirect:/accounts";
+}
+```
+```SQL
+<section>
+    <form action="/accounts/add_account" th:method="POST">
+        <label for="name">Name</label>
+        <input name="name" type="text" id="name"/>
+        <br>
+
+        <label for="balance">surname</label>
+        <input name="balance" type="number" id="balance"/>
+        <br>
+
+        <label for="type">type</label>
+        <input name="type" type="text" id="type"/>
+        <br>
+
+        <input type="submit" value="Add account">
+    </form>
+</section>
+```
+
+С использованием шаблонизатора Thymeleaf
+```Java
+@GetMapping("/add_account")
+public String getAddAccount(@ModelAttribute("newAccount") Account newAccount) {
+    return "accounts/account_add_form";
+}
+
+@PostMapping("/add_account")
+public String postAddedAccount(@ModelAttribute("newAccount") Account newAccount) {
+    accountDAO.addAccount(newAccount);
+    return "redirect:/accounts";
+}
+```
+```SQL
+<section>
+    <form action="#" th:method="POST" th:action="@{/accounts/add_account}" th:object="${newAccount}">
+        <label for="name">Name</label>
+        <input name="name" type="text" th:field="*{name}" id="name"/>
+        <br>
+
+        <label for="balance">surname</label>
+        <input name="balance" type="number" th:field="*{balance}" id="balance"/>
+        <br>
+
+        <label for="type">type</label>
+        <input name="type" type="text" th:field="*{type}" id="type"/>
+        <br>
+
+        <input type="submit" value="Add account">
+    </form>
+</section>
+```
+
