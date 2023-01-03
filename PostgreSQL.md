@@ -681,3 +681,64 @@ age int check (age > 0) // не может быть меньше 0.
 
 
 Так же есть понятие **Денормализации**. Не всегда нужно приводить таблицу по 3НФ, так как это может привести к огромному кол-ву Join, а значит Select будет медленнее. Поэтому иногда лучше пренебречь некоторыми правилами.
+
+# View (Представления)
+
+**Создание View**
+```SQL
+CREATE VIEW view_name AS
+SELECT select_statement
+```
+**Замена View**
+```SQL
+CREATE OR REPLACE VIEW view_name AS
+SELECT select_statement
+```
+**Переименование**
+```SQL
+ALTER VIEW old_view_name RENAME TO new_view_name
+```
+Пример использования
+```SQL
+CREATE VIEW products_suppliers_categories AS
+SELECT product_name, quantity_per_unit, unit_price, units_in_stock, company_name, contact_name, phone, category_name, description
+FROM suppliers
+LEFT JOIN products ON suppliers.supplier_id = products.product_id
+LEFT JOIN categories ON products.category_id = categories.category_id;
+
+SELECT *
+FROM products_suppliers_categories;
+
+```
+
+1. View - Это сохраненный запрос в виде объекта в БД
+2. К view можно делать обычный Select
+3. View можно соединять
+4. Производительность такая же, как и у обычной таблицы
+5. Позволяет делать кеширование с помощью материализации
+6. Позволяет сокращать сложные запросы
+7. Позволяет подменить реальную таблицу
+8. Позволяет создавать виртуальные таблицы, соединяющие несколько таблиц - Это нужно для сокрытия структуры данных
+9. Позволяет скрыть логику агрегации данных при работе через ORM - Object relation mapper.
+10. Позволяет скрыть информацию (столбцы) от групп ползователей.
+11. Позволяет скрыть информацию на уровне строк от групп пользователей (строки отсекаются самим запросом)
+
+**Типы представлений**
+1. Временные
+2. Рекурсивные
+3. Обновляемые
+4. Материализуемые
+
+При изменении представлени:
+- Нельзя удалить существующие столбцы
+- нельзя поменять имена столбцов
+- нельзя поменять порядок следования
+Для всего этого нужно исопльзовать **Replace**
+
+Но, можно переименовывать представление
+
+Можно модифицировать данные через представление:
+1. Только еслии одна таблица в From
+2. нет Distinct, group by, having, union, intersect, except, limit
+3. нет оконных функций, min, max, sum, count, avg
+4. Where разрешен
