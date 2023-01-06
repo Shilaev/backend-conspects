@@ -689,6 +689,25 @@ age int check (age > 0) // не может быть меньше 0.
 CREATE VIEW view_name AS
 SELECT select_statement
 ```
+**!ВАЖНО**
+Через View мы можем вставить данные в таблицу, которые **ПРОТИВОРЕЧАТ** фильтру этой табилцы.
+Например вставим число 50, хотя в таблице есть CHECK < 50!
+Поэтому перед соданием VIEW в самом конце надо прописать WITH LOCAL CHECK OPTION, либо WITCH CASCADE CHECK OPTION - тогда будут учитываться еще и CHECK Вьюх, который созданы на основе существующих вьюх
+```SQL
+CREATE VIEW products_suppliers_categories AS
+SELECT product_name, quantity_per_unit, unit_price, units_in_stock, company_name, contact_name, phone, category_name, description
+FROM suppliers
+LEFT JOIN products ON suppliers.supplier_id = products.product_id
+LEFT JOIN categories ON products.category_id = categories.category_id
+WITH LOCAL CHECK OPTION; или WITH CASCADE CHECK OPTION
+```
+Пример создания VIEW с запретом на вставку данных, которые не соответствуют условию WHERE
+```SQL
+CREATE VIEW view_name AS
+SELECT * FROM table_name
+WHERE table_name.column < 10
+WITH LOCAL CHECK OPTION
+```
 **Замена View**
 ```SQL
 CREATE OR REPLACE VIEW view_name AS
@@ -742,3 +761,5 @@ FROM products_suppliers_categories;
 2. нет Distinct, group by, having, union, intersect, except, limit
 3. нет оконных функций, min, max, sum, count, avg
 4. Where разрешен
+
+# Case, Coalesce, Nullif
