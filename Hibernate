@@ -1,0 +1,14 @@
+Из-за того, что классы в java и сущности в Базе данных похожи, было придуманно ORM
+
+<img src="./images/java_db_connect.png" alt="alt text" width="400"/>
+<img src="./images/java_and_db_names_comparsion.png" alt="alt text" width="400"/>
+
+
+
+**ORM** - Object-Relation Mapping - Объектное отображениее таблицы.
+<img src="./images/ORM.png" alt="alt text" width="400"/>
+**ORM** за нас отображает объекты и таблицы.
+Hibernate - Это ORM, который за нас автоматизирует отображение Java объектов в встроки в БД.
+Теперь не нужно писать SQL код, для сохранения объекта.
+Hibernate все сделает сам. 
+Himernate сам делает Join-ы
