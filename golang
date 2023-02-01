@@ -365,3 +365,36 @@ func (u user) String() string { // Имплементация Stringer
 	return fmt.Sprintf("%s - %d", u.name, u.age)
 }
 ```
+
+## Интерфейс Reader
+Интерфейс с одним единственным методом Reader, который позволяет вычитываеть поток данных
+в байтах и возвращает число Int и ошибку
+
+Если он вернет ошибку EOF - это End of File, это просто означает, что поток закончился, нечего больше читать.
+```Go
+type Reader interface {
+	Read(p []byte) (n int, err error)
+}
+```
+
+В бесконечном цикле метот Read будет читать, пока файл не закончится.
+arr := make([]byte, 4) - Создает пустой срез байт, длиной 4
+Далее Reader будет брать по 4 байта и выводить их
+таким образом будет
+Hell - 4 байта
+o wor - еще 4 байта
+ld - еще 4 байта
+"" - пустой байт, сигнализирующий об окончании файла EOF
+```Go
+myReader := io.Reader(strings.NewReader("Hello world"))
+arr := make([]byte, 4)
+
+for {
+	n, err := myReader.Read(arr)
+	//fmt.Printf("n = %d err = %v arr = %v\n", n, err, arr)
+	fmt.Printf("%q\n", arr[:n])
+	if err == io.EOF {
+		break
+	}
+}
+```

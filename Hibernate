@@ -12,3 +12,272 @@ Hibernate - Это ORM, который за нас автоматизирует 
 Теперь не нужно писать SQL код, для сохранения объекта.
 Hibernate все сделает сам. 
 Himernate сам делает Join-ы
+
+**Сессия (Session)**
+Это объект для взаимодействия с Hibernate. Когда хотим что-то сделать с БД через hibernate - получам сессию.
+Объкт Session получаем из объекта SessionFactory (паттерн Фабрика)
+
+```Java
+SessionFactory sessionFactory = configuration.buildSessionFactory();
+Session session = sessionFactory.getCurrentSession();
+```
+
+На объекте сессии можно вызывать:
+- **save**
+- **update**
+- **get**
+- и так далее.
+
+**Транзакция Transaction** 
+Это единица работы с БД.
+```Java
+session.beginTransaction();        // Начать транзакцию
+
+session.save(person);              // Работа с БД
+session.update(person);            // Работа с БД
+
+session.getTransaction().commit(); // Завершить транзакцию
+```
+
+- Транзакции нужны для поддержания **согласованности** данных в таблице.
+- Транзакции могут блогировать доступ к БД 
+Например пока чтог-то пишется в таблицу, из нее нельзя читать.
+или Пока обновляется сущность ее нельзя обновлять в другой сессии.
+- Транзакции можно применять (**Commit**) и откатывать (**Rollback**)
+
+<img src="./images/transaction_example.png" alt="alt text" width="400"/>
+
+Это похоже на **Race condition** в многопоточном программировании. Там мы использовали разные методы, например блок **synchronized**
+В реляционных базах данных исопльзуют уровни изоляции
+**Transaction Isolation levels**
+
+## Работа с Hybernate  ORM в java
+
+Подключение к базе данных выглядит почти так же как и в случае с jdbc
+В файле hybernate.properties
+```
+# data source configuration
+hibernate.driver_class=org.postgresql.Driver
+hibernate.connection.url=jdbc:postgresql://localhost:5432/hibernate_test_db
+hibernate.connection.username=postgres
+hibernate.connection.password=voland
+
+# hibernate configuration
+hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+hibernate.show_sql=true
+hibernate.current_session_context_class=thread
+```
+
+А вот создание классов для сущностей из базы достаточно использовать аннотация **@Entity**
+Затем она сама подскажет, что нужно сгенерировать.
+А так же указывает таблицу для этой сущности с помощью аннотации **@Table**
+
+Каждую колонку ассоциируем с именем колонки в таблице с помощью аннотации **@Column**
+
+Каждая сущность обязана иметь пустой конструктор. В данном случае он созадется автоматически, с помощью аннотации из **lombok**
+
+Обязательно указать **@Id**, для Primary Key.
+
+Так же с помощью **lombok** сгенерировали геттеры, сеттеры
+```Java
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "person")
+@Setter
+@Getter
+@NoArgsConstructor
+public class Person {
+
+    @Id
+    @Column(name = "id")
+    private long id;
+    
+    @Column(name = "name")
+    private String name;
+    
+    @Column(name = "age")
+    private int age;
+}
+```
+
+Далее создаем конфигурации для данного класса в main()
+Затем с помощью SessionFactory создаем новую сессию
+и используем ее для запроса к базе данных
+```Java
+public class App {
+    public static void main(String[] args) {
+        Configuration configuration = new Configuration().addAnnotatedClass(Person.class);
+
+        SessionFactory sessionFactory = configuration.buildSessionFactory();
+        Session currentSession = sessionFactory.getCurrentSession();
+
+        try {
+            currentSession.beginTransaction();
+
+            // queries
+            Person person = currentSession.get(Person.class, 1); // Select * from Person where id = 1
+            System.out.println(person.toString());
+            // queries
+
+            currentSession.getTransaction().commit();
+        } finally {
+            sessionFactory.close();
+        }
+    }
+}
+```
+
+**Обновление**
+Просто достаем объекти обновляем его с помощью сетеров.
+Больше ниечго делать не нужно
+
+```Java
+Person personForUpdate = currentSession.get(Person.class, 5);
+personForUpdate.setName("New name");
+```
+
+**Удаление**
+```Java
+Person personForUpdate = currentSession.get(Person.class, 5);
+currentSession.remove(personForUpdate);
+```
+
+**HQL**
+Если нет возможности обойтись без запроса к базе данных, то можно использовать язык запросов HQL
+Он очень похож на SQL
+```SQL
+-- HQL --
+FROM Person WHERE name = 'test'
+
+-- SQL --
+SELECT * FROM person WHERE name = 'test'
+```
+
+Основное различие в том, что в HQL работа идет не с таблицами, а с классами (сущностями)
+Person - это класс, созданный на основе таблицы person
+
+```Java
+try {
+    currentSession.beginTransaction();
+    List<Person> personList = currentSession.createQuery("FROM Person WHERE age > 30").getResultList();
+
+    for (int i = 0; i < personList.size(); i++) {
+        System.out.printf("%s, %d\n", personList.get(i).getName(), personList.get(i).getAge());
+    }
+
+    currentSession.getTransaction().commit();
+} finally {
+    sessionFactory.close();
+}
+```
+
+Для обновления используем запрос и executeUpdate();
+```Java
+currentSession.createQuery("update Person set name = 'Test name' where age = 30").executeUpdate();
+```
+
+## Жизненный цикл сущностей Hibernate
+Все Java-объекты проходят через
+1) **Transient**
+```Java
+session.beginTransaction();
+Person person = new Person("New person", 30);
+```
+- объект пока никак не связан с Hibernate и не остлеживатеся. 
+- вызов сеттеров на этом объекте никак не влияет на состояние БД
+- Можно воспринимать как обычный Java объект
+
+2) **Persistent**
+После вызова session.persist(person);
+он перхеодит в состояниее Persistent
+
+```Java
+session.beginTransaction();
+Person person = new Person("New person", 30);
+
+// сохраняем. делаем этот объект Persistent
+session.persist(person);
+```
+
+Либо когда объект вызывается через  session.get
+
+```Java
+Person person = session.get(Person.class, 3);
+```
+
+Он находится в этом состоянии пока работает Hibernate сессия.
+Эти объекты отслеживаются Hibernate. 
+
+И на этих объектах любой вызов сеттеров - генерирует SQL код
+
+3) **Detached** состояние
+```Java
+session.beginTransaction();
+Person person = new Person("New person", 30);
+
+// сохраняем. делаем этот объект Persistent
+session.persist(person);
+
+// детачим объект
+session.detach(person);
+```
+
+Теперь hibernate снова не отслеживает этот объект и его сеттеры не генерируют sql код
+
+Если надо снова начать отслеживать объект, то используем метод **merge**
+
+4) **Removed**
+После **session.remove();** этот объект удалится из hibernate кэша 
+
+## Ленивая загрузка (lazy) и Нетерпеливая (Eager) загрузка
+
+связь один ко многим:
+У человека может быть дохуя товаров.
+Мы хотим получить данные о человеке, но нам пок ане нужны данные о всех его товаров, это ж дохера информации.
+От сюда вопрос, данные о товаре загрузятся сразу, как только мы получим человека илии после того, как вызовем геттер?
+Ответ на этот вовпрос дает нам понять что это, Lazy или Eager?
+```Java
+// Если вот здесь загрузятся сразу товары, то это Eager
+Person person = session.get(Person.class, 1);
+
+// Если только после этой строчки, то это Lazy
+System.out.println(person.getItems());
+```
+
+В Hibernate выбор загрузки делается в аннотациях, @OneToMany и других таких свсязях
+Выбирем тим извлечения, либо сразу все грузи, либо лениво - пока не попросят, не надо
+```Java
+@OneToMany(fetch = FetchType.EAGER)
+@OneToMany(fetch = FetchType.LAZY)
+```
+
+По умолчанию:
+@OneToMany = lazy
+@ManyToMany = lazy
+@ManyToOne = eager
+@OneToOne = eager
+
+**Особенности исопльзования**
+Можно подгружать связанные сущности. только, находясь внутри транзакции и сущность должна находиться в Persistent состоянии.
+
+За пределами Hibernate сессии (Detached загрузить связаннные сущности нельзя.
+
+Если нужно использовать подгруженные сущности, то можно использовать метод
+**Hibernate.initialize()**;
+
+HQL запрос, с параметрами
+```Java
+      for (int i = 1; i < 1000; i++) {
+                session.createQuery("update Person set age=:new_age where id=:id")
+                        .setParameter("new_age", ThreadLocalRandom.current().nextInt(1, 100))
+                        .setParameter("id", i)
+                        .executeUpdate();
+            }
+```

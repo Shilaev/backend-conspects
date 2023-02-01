@@ -763,3 +763,66 @@ FROM products_suppliers_categories;
 4. Where разрешен
 
 # Case, Coalesce, Nullif
+Тут все понятно, Case как и в программировании
+
+```SQL
+select order_id,
+       order_date,
+       case
+           when date_part('month', order_date) = 1 then 'Jan'
+           when date_part('month', order_date) = 2 then 'Feb'
+           when date_part('month', order_date) = 3 then 'Mar'
+           when date_part('month', order_date) = 4 then 'Apr'
+           when date_part('month', order_date) = 5 then 'May'
+           when date_part('month', order_date) = 6 then 'Jun'
+           when date_part('month', order_date) = 7 then 'Jul'
+           when date_part('month', order_date) = 8 then 'Aug'
+           when date_part('month', order_date) = 9 then 'Sep'
+           when date_part('month', order_date) = 10 then 'Oct'
+           when date_part('month', order_date) = 11 then 'Nov'
+           when date_part('month', order_date) = 12 then 'Dec'
+           else 'error'
+           end as order_month
+from orders
+order by order_date;
+```
+
+**Coalesce**
+Возвращает Первый аргумент, который не Null. Если все аргументы Null, то вернет Null.
+Используется, чтобы подставить что-то вместо Null.
+coalesce(arg1, arg2, ...)
+
+В примере, если ship_region = null, то выведется вместо этого unknown
+```SQL
+select coalesce(ship_region, 'unknown')
+from orders
+limit 10;
+```
+
+**NULLIF**
+Сравнивает 2 аргумента, если они равны, то возвращает NULL
+Часто используется вместе с Coalesce, можем проверить 1 аргумент равен какомо-нибудь 2 аргументу, которому мы не хотим, чтобы он был равен 1.
+
+В примере. Если customer_is = ALFKI, то вернется NULL и тогда COALESCE подставит 'WTF IS THAT?'
+```SQL
+select coalesce(nullif(customer_id, 'ALFKI'), 'WTF IS THAT?'),
+       company_name,
+       contact_name,
+       contact_title,
+       address,
+       city,
+       region,
+       postal_code,
+       country,
+       phone,
+       fax
+from customers;
+```
+
+В этом примере мы сравниваем текущий год и предыдущий, если они равны - выводим надпись - same as previous
+С помощью to_char переводим число, которое вернется из nullif в char, FM9999999 - это просто формат в котором будет
+выводиться строка, читать докуменатцию.
+```SQL
+select coalesce(to_char(nullif(current_year, previous_year), 'FM999999999'), 'same as previous')
+from budget;
+```
